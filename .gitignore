@@ -1,6 +1,6 @@
 .env
 .idea
-.npmrc.secret
+cdk.context.json
 
 cdk.out
 coverage
