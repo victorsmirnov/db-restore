@@ -1,5 +1,4 @@
 import {DBCluster, RDS} from "@aws-sdk/client-rds";
-import {DBClusterSnapshot} from "@aws-sdk/client-rds/dist-types/models/models_0.js";
 import {env} from "process";
 import {App, Duration, SecretValue, Stack} from "aws-cdk-lib";
 import {
@@ -22,6 +21,8 @@ import {
     LinuxBuildImage,
 } from "aws-cdk-lib/aws-codebuild";
 import {ManagedPolicy} from "aws-cdk-lib/aws-iam";
+import {Rule, Schedule} from "aws-cdk-lib/aws-events";
+import {CodePipeline as TargetCodePipeline} from "aws-cdk-lib/aws-events-targets";
 
 const rds = new RDS({});
 const snapshotIdentifier = await findLatestSnapshotArn(env.SOURCE_CLUSTER_NAME);
@@ -53,13 +54,13 @@ const databaseCluster = new ServerlessClusterFromSnapshot(
         enableDataApi: true,
         engine: DatabaseClusterEngine.auroraMysql({
             version: AuroraMysqlEngineVersion.of(
-                String(clusterProduction.EngineVersion),
+                String(clusterProduction.EngineVersion)
             ),
         }),
         parameterGroup: ParameterGroup.fromParameterGroupName(
             stack,
             "DatabaseParameterGroup",
-            String(clusterProduction.DBClusterParameterGroup),
+            String(clusterProduction.DBClusterParameterGroup)
         ),
         scaling: {
             autoPause: Duration.minutes(30),
@@ -69,7 +70,7 @@ const databaseCluster = new ServerlessClusterFromSnapshot(
         snapshotIdentifier,
         vpc,
         vpcSubnets: {subnetType: SubnetType.PRIVATE_WITH_NAT},
-    },
+    }
 );
 
 databaseCluster.connections.allowDefaultPortFrom(Peer.ipv4(vpc.vpcCidrBlock));
@@ -136,26 +137,21 @@ const pipeline = new CodePipeline(stack, "DeploymentPipeline", {
     crossAccountKeys: false,
     pipelineName: env.PIPELINE_NAME,
     synth: new CodeBuildStep("DeploymentStack", {
-        // FIXME: Take this from the environment
         input: CodePipelineSource.gitHub(env.GITHUB_REPO, env.GITHUB_BRANCH, {
             authentication: SecretValue.secretsManager(env.GITHUB_SECRET),
         }),
-        commands: ["npm ci", "npm run build", `npm run cdk synth`],
+        commands: ["npm ci", "npm run build", "npx cdk synth"],
     }),
 });
 pipeline.buildPipeline();
 pipeline.synthProject.role?.addManagedPolicy(
-    ManagedPolicy.fromAwsManagedPolicyName("ReadOnlyAccess"),
+    ManagedPolicy.fromAwsManagedPolicyName("ReadOnlyAccess")
 );
 
-interface SafeDBClusterSnapshot
-    extends Omit<
-        DBClusterSnapshot,
-        "DBClusterSnapshotArn" | "SnapshotCreateTime"
-    > {
-    DBClusterSnapshotArn: string;
-    SnapshotCreateTime: Date;
-}
+new Rule(stack, "ScheduleRule", {
+    schedule: Schedule.cron({minute: "0", hour: "6"}),
+    targets: [new TargetCodePipeline(pipeline.pipeline)],
+});
 
 async function describeCluster(clusterIdentifier: string): Promise<DBCluster> {
     const clusters = (
@@ -173,30 +169,25 @@ async function describeCluster(clusterIdentifier: string): Promise<DBCluster> {
     return cluster;
 }
 
-async function findLatestSnapshotArn(
-    clusterIdentifier: string,
-): Promise<string> {
+async function findLatestSnapshotArn(cluster: string): Promise<string> {
     const snapshots = await rds.describeDBClusterSnapshots({
-        DBClusterIdentifier: clusterIdentifier,
+        DBClusterIdentifier: cluster,
         SnapshotType: "automated",
     });
     if (snapshots.DBClusterSnapshots === undefined) {
-        throw new Error("Failed to find snapshots for " + clusterIdentifier);
+        throw new Error("Failed to find snapshots for " + cluster);
     }
 
-    const snapshot = snapshots.DBClusterSnapshots.filter(
-        (s): s is SafeDBClusterSnapshot =>
-            s.SnapshotCreateTime !== undefined &&
-            s.DBClusterSnapshotArn !== undefined,
+    const snapshotArn = snapshots.DBClusterSnapshots.sort(
+        (a, b) =>
+            (b.SnapshotCreateTime?.getTime() ?? 0) -
+            (a.SnapshotCreateTime?.getTime() ?? 0)
     )
-        .sort(
-            (a, b) =>
-                b.SnapshotCreateTime.getTime() - a.SnapshotCreateTime.getTime(),
-        )
+        .map((s) => s.DBClusterSnapshotArn)
         .shift();
-    if (snapshot === undefined) {
-        throw new Error("Failed to find snapshots for " + clusterIdentifier);
+    if (snapshotArn === undefined) {
+        throw new Error("Failed to find snapshots for " + cluster);
     }
 
-    return snapshot.DBClusterSnapshotArn;
+    return snapshotArn;
 }
