@@ -1,0 +1,8 @@
+.env
+.idea
+.npmrc.secret
+
+cdk.out
+coverage
+dist
+node_modules
