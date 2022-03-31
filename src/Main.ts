@@ -77,6 +77,9 @@ new CodePipeline(stack, "DeploymentPipeline", {
                 CDK_DEFAULT_ACCOUNT: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.CDK_DEFAULT_ACCOUNT},
                 CDK_DEFAULT_REGION: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.CDK_DEFAULT_REGION},
                 CLUSTER_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.CLUSTER_NAME},
+                GITHUB_BRANCH: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.GITHUB_BRANCH},
+                GITHUB_REPO: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.GITHUB_REPO},
+                GITHUB_SECRET: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.GITHUB_SECRET},
                 PIPELINE_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.PIPELINE_NAME},
                 SOURCE_CLUSTER_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.SOURCE_CLUSTER_NAME},
                 STACK_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.STACK_NAME},
@@ -94,8 +97,8 @@ new CodePipeline(stack, "DeploymentPipeline", {
     pipelineName: env.PIPELINE_NAME,
     synth: new CodeBuildStep("DeploymentStack", {
             // FIXME: Take this from the environment
-            input: CodePipelineSource.gitHub("victorsmirnov/db-restore", "main",{
-                authentication: SecretValue.secretsManager("github", {jsonField: "hooks"}),
+            input: CodePipelineSource.gitHub(env.GITHUB_REPO, env.GITHUB_BRANCH,{
+                authentication: SecretValue.secretsManager(env.GITHUB_SECRET),
             }),
             commands: [
                 "npm ci",

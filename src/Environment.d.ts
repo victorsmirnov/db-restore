@@ -7,6 +7,12 @@ declare global {
 
             CLUSTER_NAME: string;
 
+            GITHUB_BRANCH: string;
+
+            GITHUB_REPO: string;
+
+            GITHUB_SECRET: string;
+
             PIPELINE_NAME: string;
 
             SOURCE_CLUSTER_NAME: string;
