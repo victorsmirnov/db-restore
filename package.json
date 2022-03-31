@@ -7,6 +7,7 @@
         "@aws-sdk/client-rds": "^3.58.0",
         "aws-cdk-lib": "^2.18.0",
         "cdk": "^2.18.0",
+        "constructs": "^10.0.101",
         "dotenv": "^16.0.0",
         "joi": "^17.6.0"
     },
