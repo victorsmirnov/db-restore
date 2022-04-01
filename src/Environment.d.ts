@@ -13,6 +13,8 @@ declare global {
 
             GITHUB_SECRET: string;
 
+            SCHEDULE: string;
+
             PIPELINE_NAME: string;
 
             SOURCE_CLUSTER_NAME: string;

@@ -115,6 +115,10 @@ const pipeline = new CodePipeline(stack, "DeploymentPipeline", {
                     type: BuildEnvironmentVariableType.PLAINTEXT,
                     value: env.PIPELINE_NAME,
                 },
+                SCHEDULE: {
+                    type: BuildEnvironmentVariableType.PLAINTEXT,
+                    value: env.SCHEDULE,
+                },
                 SOURCE_CLUSTER_NAME: {
                     type: BuildEnvironmentVariableType.PLAINTEXT,
                     value: env.SOURCE_CLUSTER_NAME,
@@ -149,7 +153,7 @@ pipeline.synthProject.role?.addManagedPolicy(
 );
 
 new Rule(stack, "ScheduleRule", {
-    schedule: Schedule.cron({minute: "0", hour: "6"}),
+    schedule: Schedule.expression(env.SCHEDULE),
     targets: [new TargetCodePipeline(pipeline.pipeline)],
 });
 
