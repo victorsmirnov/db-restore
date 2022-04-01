@@ -23,6 +23,12 @@ import {
 import {ManagedPolicy} from "aws-cdk-lib/aws-iam";
 import {Rule, Schedule} from "aws-cdk-lib/aws-events";
 import {CodePipeline as TargetCodePipeline} from "aws-cdk-lib/aws-events-targets";
+import {NodejsFunction} from "aws-cdk-lib/aws-lambda-nodejs";
+import {Runtime} from "aws-cdk-lib/aws-lambda";
+import path from "path";
+import {fileURLToPath} from "url";
+import {Trigger} from "aws-cdk-lib/triggers";
+import {Secret} from "aws-cdk-lib/aws-secretsmanager";
 
 const rds = new RDS({});
 const snapshotIdentifier = await findLatestSnapshotArn(env.SOURCE_CLUSTER_NAME);
@@ -41,6 +47,12 @@ const domainZonePrivate = HostedZone.fromLookup(stack, "ZonePrivate", {
     privateZone: true,
     vpcId: env.VPC_ID,
 });
+
+const sourceSecret = Secret.fromSecretNameV2(
+    stack,
+    "SourceSecret",
+    env.SOURCE_SECRET_NAME
+);
 
 const today = String(new Date().toISOString().split("T")[0]);
 const clusterResource = `Database${today}`;
@@ -75,6 +87,35 @@ const databaseCluster = new ServerlessClusterFromSnapshot(
 
 databaseCluster.connections.allowDefaultPortFrom(Peer.ipv4(vpc.vpcCidrBlock));
 
+const changePwdFunction = new NodejsFunction(stack, "ChangePwdFunction", {
+    bundling: {
+        minify: false,
+    },
+    entry: path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "/ChangePassword.js"
+    ),
+    environment: {
+        SECRET_NAME: env.SECRET_NAME,
+        SOURCE_SECRET_NAME: env.SOURCE_SECRET_NAME,
+    },
+    handler: "handler",
+    memorySize: 1024,
+    runtime: Runtime.NODEJS_14_X,
+    timeout: Duration.seconds(5),
+    vpc,
+});
+
+sourceSecret.grantRead(changePwdFunction);
+
+databaseCluster.connections.allowDefaultPortFrom(changePwdFunction);
+
+new Trigger(stack, "ChangePwdTrigger", {
+    executeAfter: [databaseCluster],
+    handler: changePwdFunction,
+    executeOnHandlerChange: true,
+});
+
 new CnameRecord(stack, "CnameRecord", {
     recordName: env.CLUSTER_NAME,
     zone: domainZonePrivate,
@@ -82,6 +123,7 @@ new CnameRecord(stack, "CnameRecord", {
 });
 
 const pipeline = new CodePipeline(stack, "DeploymentPipeline", {
+    selfMutation: false,
     codeBuildDefaults: {
         buildEnvironment: {
             buildImage: LinuxBuildImage.STANDARD_5_0,

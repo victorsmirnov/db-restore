@@ -15,9 +15,13 @@ declare global {
 
             SCHEDULE: string;
 
+            SECRET_NAME: string;
+
             PIPELINE_NAME: string;
 
             SOURCE_CLUSTER_NAME: string;
+
+            SOURCE_SECRET_NAME: string;
 
             STACK_NAME: string;
 
