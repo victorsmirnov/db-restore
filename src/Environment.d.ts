@@ -21,8 +21,6 @@ declare global {
 
             SOURCE_CLUSTER_NAME: string;
 
-            SOURCE_SECRET_NAME: string;
-
             STACK_NAME: string;
 
             VPC_ID: string;

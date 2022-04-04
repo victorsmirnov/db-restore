@@ -7,27 +7,15 @@ import {
     DatabaseClusterEngine,
     ParameterGroup,
     ServerlessClusterFromSnapshot,
+    SnapshotCredentials,
 } from "aws-cdk-lib/aws-rds";
 import {Peer, SubnetType, Vpc} from "aws-cdk-lib/aws-ec2";
 import {CnameRecord, HostedZone} from "aws-cdk-lib/aws-route53";
-import {
-    CodeBuildStep,
-    CodePipeline,
-    CodePipelineSource,
-} from "aws-cdk-lib/pipelines";
-import {
-    BuildEnvironmentVariableType,
-    ComputeType,
-    LinuxBuildImage,
-} from "aws-cdk-lib/aws-codebuild";
+import {CodeBuildStep, CodePipeline, CodePipelineSource} from "aws-cdk-lib/pipelines";
+import {BuildEnvironmentVariableType, ComputeType, LinuxBuildImage} from "aws-cdk-lib/aws-codebuild";
 import {ManagedPolicy} from "aws-cdk-lib/aws-iam";
 import {Rule, Schedule} from "aws-cdk-lib/aws-events";
 import {CodePipeline as TargetCodePipeline} from "aws-cdk-lib/aws-events-targets";
-import {NodejsFunction} from "aws-cdk-lib/aws-lambda-nodejs";
-import {Runtime} from "aws-cdk-lib/aws-lambda";
-import path from "path";
-import {fileURLToPath} from "url";
-import {Trigger} from "aws-cdk-lib/triggers";
 import {Secret} from "aws-cdk-lib/aws-secretsmanager";
 
 const rds = new RDS({});
@@ -48,73 +36,76 @@ const domainZonePrivate = HostedZone.fromLookup(stack, "ZonePrivate", {
     vpcId: env.VPC_ID,
 });
 
-const sourceSecret = Secret.fromSecretNameV2(
-    stack,
-    "SourceSecret",
-    env.SOURCE_SECRET_NAME
-);
+const restoredSecret = Secret.fromSecretNameV2(stack, "RestoredSecret", env.SECRET_NAME);
 
 const today = String(new Date().toISOString().split("T")[0]);
 const clusterResource = `Database${today}`;
 const clusterName = `${env.CLUSTER_NAME}-${today}`;
-const databaseCluster = new ServerlessClusterFromSnapshot(
-    stack,
-    clusterResource,
-    {
-        backupRetention: Duration.days(1),
-        clusterIdentifier: clusterName,
-        enableDataApi: true,
-        engine: DatabaseClusterEngine.auroraMysql({
-            version: AuroraMysqlEngineVersion.of(
-                String(clusterProduction.EngineVersion)
-            ),
-        }),
-        parameterGroup: ParameterGroup.fromParameterGroupName(
-            stack,
-            "DatabaseParameterGroup",
-            String(clusterProduction.DBClusterParameterGroup)
-        ),
-        scaling: {
-            autoPause: Duration.minutes(30),
-            minCapacity: AuroraCapacityUnit.ACU_8,
-            maxCapacity: AuroraCapacityUnit.ACU_32,
-        },
-        snapshotIdentifier,
-        vpc,
-        vpcSubnets: {subnetType: SubnetType.PRIVATE_WITH_NAT},
-    }
-);
+const databaseCluster = new ServerlessClusterFromSnapshot(stack, clusterResource, {
+    backupRetention: Duration.days(1),
+    clusterIdentifier: clusterName,
+    credentials: SnapshotCredentials.fromSecret(restoredSecret),
+    enableDataApi: true,
+    engine: DatabaseClusterEngine.auroraMysql({
+        version: AuroraMysqlEngineVersion.of(String(clusterProduction.EngineVersion)),
+    }),
+    parameterGroup: ParameterGroup.fromParameterGroupName(
+        stack,
+        "DatabaseParameterGroup",
+        String(clusterProduction.DBClusterParameterGroup)
+    ),
+    scaling: {
+        autoPause: Duration.minutes(30),
+        minCapacity: AuroraCapacityUnit.ACU_8,
+        maxCapacity: AuroraCapacityUnit.ACU_32,
+    },
+    snapshotIdentifier,
+    vpc,
+    vpcSubnets: {subnetType: SubnetType.PRIVATE_WITH_NAT},
+});
 
 databaseCluster.connections.allowDefaultPortFrom(Peer.ipv4(vpc.vpcCidrBlock));
 
-const changePwdFunction = new NodejsFunction(stack, "ChangePwdFunction", {
-    bundling: {
-        minify: false,
-    },
-    entry: path.join(
-        path.dirname(fileURLToPath(import.meta.url)),
-        "/ChangePassword.js"
-    ),
-    environment: {
-        SECRET_NAME: env.SECRET_NAME,
-        SOURCE_SECRET_NAME: env.SOURCE_SECRET_NAME,
-    },
-    handler: "handler",
-    memorySize: 1024,
-    runtime: Runtime.NODEJS_14_X,
-    timeout: Duration.seconds(5),
-    vpc,
-});
-
-sourceSecret.grantRead(changePwdFunction);
-
-databaseCluster.connections.allowDefaultPortFrom(changePwdFunction);
-
-new Trigger(stack, "ChangePwdTrigger", {
-    executeAfter: [databaseCluster],
-    handler: changePwdFunction,
-    executeOnHandlerChange: true,
-});
+// const changePwdFunction = new NodejsFunction(stack, "ChangePwdFunction", {
+//     bundling: {
+//         minify: false,
+//     },
+//     entry: path.join(
+//         path.dirname(fileURLToPath(import.meta.url)),
+//         "/ChangePassword.js"
+//     ),
+//     environment: {
+//         SECRET_NAME: env.SECRET_NAME,
+//     },
+//     handler: "handler",
+//     memorySize: 1024,
+//     runtime: Runtime.NODEJS_14_X,
+//     timeout: Duration.seconds(5),
+//     vpc,
+// });
+//
+// sourceSecret.grantRead(changePwdFunction);
+//
+// databaseCluster.connections.allowDefaultPortFrom(changePwdFunction);
+//
+// new Trigger(stack, "ChangePwdTrigger", {
+//     executeAfter: [databaseCluster],
+//     handler: changePwdFunction,
+//     executeOnHandlerChange: true,
+// });
+//
+// const triggerFunction = new TriggerFunction(stack, "ChangePwdTrigger", {
+//     code: Code.fromAsset(path.dirname(fileURLToPath(import.meta.url))),
+//     environment: {
+//         SECRET_NAME: env.SECRET_NAME,
+//     },
+//     executeAfter: [databaseCluster],
+//     handler: "ChangePassword.handler",
+//     runtime: Runtime.NODEJS_14_X,
+//     vpc,
+// });
+//
+// sourceSecret.grantRead(triggerFunction);
 
 new CnameRecord(stack, "CnameRecord", {
     recordName: env.CLUSTER_NAME,
@@ -123,7 +114,7 @@ new CnameRecord(stack, "CnameRecord", {
 });
 
 const pipeline = new CodePipeline(stack, "DeploymentPipeline", {
-    selfMutation: false,
+    // selfMutation: false,
     codeBuildDefaults: {
         buildEnvironment: {
             buildImage: LinuxBuildImage.STANDARD_5_0,
@@ -190,9 +181,7 @@ const pipeline = new CodePipeline(stack, "DeploymentPipeline", {
     }),
 });
 pipeline.buildPipeline();
-pipeline.synthProject.role?.addManagedPolicy(
-    ManagedPolicy.fromAwsManagedPolicyName("ReadOnlyAccess")
-);
+pipeline.synthProject.role?.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName("ReadOnlyAccess"));
 
 new Rule(stack, "ScheduleRule", {
     schedule: Schedule.expression(env.SCHEDULE),
@@ -200,9 +189,7 @@ new Rule(stack, "ScheduleRule", {
 });
 
 async function describeCluster(clusterIdentifier: string): Promise<DBCluster> {
-    const clusters = (
-        await rds.describeDBClusters({DBClusterIdentifier: "monolith-develop"})
-    ).DBClusters;
+    const clusters = (await rds.describeDBClusters({DBClusterIdentifier: "monolith-develop"})).DBClusters;
     if (clusters === undefined) {
         throw new Error("Failed to fetch cluster " + clusterIdentifier);
     }
@@ -225,9 +212,7 @@ async function findLatestSnapshotArn(cluster: string): Promise<string> {
     }
 
     const snapshotArn = snapshots.DBClusterSnapshots.sort(
-        (a, b) =>
-            (b.SnapshotCreateTime?.getTime() ?? 0) -
-            (a.SnapshotCreateTime?.getTime() ?? 0)
+        (a, b) => (b.SnapshotCreateTime?.getTime() ?? 0) - (a.SnapshotCreateTime?.getTime() ?? 0)
     )
         .map((s) => s.DBClusterSnapshotArn)
         .shift();
