@@ -120,54 +120,19 @@ const pipeline = new CodePipeline(stack, "DeploymentPipeline", {
             buildImage: LinuxBuildImage.STANDARD_5_0,
             computeType: ComputeType.SMALL,
             environmentVariables: {
-                CDK_DEFAULT_ACCOUNT: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.CDK_DEFAULT_ACCOUNT,
-                },
-                CDK_DEFAULT_REGION: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.CDK_DEFAULT_REGION,
-                },
-                CLUSTER_NAME: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.CLUSTER_NAME,
-                },
-                GITHUB_BRANCH: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.GITHUB_BRANCH,
-                },
-                GITHUB_REPO: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.GITHUB_REPO,
-                },
-                GITHUB_SECRET: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.GITHUB_SECRET,
-                },
-                PIPELINE_NAME: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.PIPELINE_NAME,
-                },
-                SCHEDULE: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.SCHEDULE,
-                },
-                SOURCE_CLUSTER_NAME: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.SOURCE_CLUSTER_NAME,
-                },
-                STACK_NAME: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.STACK_NAME,
-                },
-                VPC_ID: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.VPC_ID,
-                },
-                ZONE_NAME: {
-                    type: BuildEnvironmentVariableType.PLAINTEXT,
-                    value: env.ZONE_NAME,
-                },
+                CDK_DEFAULT_ACCOUNT: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.CDK_DEFAULT_ACCOUNT},
+                CDK_DEFAULT_REGION: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.CDK_DEFAULT_REGION},
+                CLUSTER_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.CLUSTER_NAME},
+                GITHUB_BRANCH: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.GITHUB_BRANCH},
+                GITHUB_REPO: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.GITHUB_REPO},
+                GITHUB_SECRET: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.GITHUB_SECRET},
+                PIPELINE_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.PIPELINE_NAME},
+                SCHEDULE: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.SCHEDULE},
+                SECRET_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.SECRET_NAME},
+                SOURCE_CLUSTER_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.SOURCE_CLUSTER_NAME},
+                STACK_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.STACK_NAME},
+                VPC_ID: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.VPC_ID},
+                ZONE_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.ZONE_NAME},
             },
         },
     },
