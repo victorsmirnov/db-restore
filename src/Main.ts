@@ -5,7 +5,6 @@ import {
     AuroraCapacityUnit,
     AuroraMysqlEngineVersion,
     DatabaseClusterEngine,
-    ParameterGroup,
     ServerlessClusterFromSnapshot,
     SnapshotCredentials,
 } from "aws-cdk-lib/aws-rds";
@@ -21,6 +20,11 @@ import {Secret} from "aws-cdk-lib/aws-secretsmanager";
 const rds = new RDS({});
 const snapshotIdentifier = await findLatestSnapshotArn(env.SOURCE_CLUSTER_NAME);
 const clusterProduction = await describeCluster(env.SOURCE_CLUSTER_NAME);
+
+console.log({
+    Engine: clusterProduction.Engine,
+    EngineVersion: clusterProduction.EngineVersion,
+});
 
 const app = new App();
 const stack = new Stack(app, "RestoreStack", {
@@ -49,11 +53,6 @@ const databaseCluster = new ServerlessClusterFromSnapshot(stack, clusterResource
     engine: DatabaseClusterEngine.auroraMysql({
         version: AuroraMysqlEngineVersion.of(String(clusterProduction.EngineVersion)),
     }),
-    parameterGroup: ParameterGroup.fromParameterGroupName(
-        stack,
-        "DatabaseParameterGroup",
-        String(clusterProduction.DBClusterParameterGroup)
-    ),
     scaling: {
         autoPause: Duration.minutes(30),
         minCapacity: AuroraCapacityUnit.ACU_8,
