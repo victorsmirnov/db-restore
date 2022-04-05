@@ -20,11 +20,12 @@ import {Secret} from "aws-cdk-lib/aws-secretsmanager";
 const rds = new RDS({});
 const snapshotIdentifier = await findLatestSnapshotArn(env.SOURCE_CLUSTER_NAME);
 const clusterProduction = await describeCluster(env.SOURCE_CLUSTER_NAME);
+const engine = String(clusterProduction.Engine);
+const engineVersion = String(clusterProduction.EngineVersion);
 
-console.log({
-    Engine: clusterProduction.Engine,
-    EngineVersion: clusterProduction.EngineVersion,
-});
+if (clusterProduction.Engine !== "aurora-mysql") {
+    throw new Error(`Only aurora-mysql engine is supported. Cluster ${env.SOURCE_CLUSTER_NAME} is ${engine}`);
+}
 
 const app = new App();
 const stack = new Stack(app, "RestoreStack", {
@@ -50,9 +51,7 @@ const databaseCluster = new ServerlessClusterFromSnapshot(stack, clusterResource
     clusterIdentifier: clusterName,
     credentials: SnapshotCredentials.fromSecret(restoredSecret),
     enableDataApi: true,
-    engine: DatabaseClusterEngine.auroraMysql({
-        version: AuroraMysqlEngineVersion.of(String(clusterProduction.EngineVersion)),
-    }),
+    engine: DatabaseClusterEngine.auroraMysql({version: AuroraMysqlEngineVersion.of(engineVersion)}),
     scaling: {
         autoPause: Duration.minutes(30),
         minCapacity: AuroraCapacityUnit.ACU_8,
