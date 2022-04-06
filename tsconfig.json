@@ -35,10 +35,5 @@
         "types": ["node"],
         "useUnknownInCatchVariables": true
     },
-    "include": ["src/**/*", "test/**/*", "jest.config.ts"],
-    "ts-node": {
-        "moduleTypes": {
-            "jest.config.ts": "cjs"
-        }
-    }
+    "include": ["src/**/*"]
 }

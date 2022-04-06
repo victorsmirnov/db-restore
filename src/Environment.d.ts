@@ -13,13 +13,15 @@ declare global {
 
             GITHUB_SECRET: string;
 
-            SCHEDULE: string;
+            MASTER_SECRET: string;
 
-            SECRET_NAME: string;
+            SCHEDULE: string;
 
             PIPELINE_NAME: string;
 
             SOURCE_CLUSTER_NAME: string;
+
+            SOURCE_MASTER_SECRET: string;
 
             STACK_NAME: string;
 

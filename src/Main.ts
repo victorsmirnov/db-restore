@@ -12,10 +12,13 @@ import {Peer, SubnetType, Vpc} from "aws-cdk-lib/aws-ec2";
 import {CnameRecord, HostedZone} from "aws-cdk-lib/aws-route53";
 import {CodeBuildStep, CodePipeline, CodePipelineSource} from "aws-cdk-lib/pipelines";
 import {BuildEnvironmentVariableType, ComputeType, LinuxBuildImage} from "aws-cdk-lib/aws-codebuild";
-import {ManagedPolicy} from "aws-cdk-lib/aws-iam";
+import {ManagedPolicy, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 import {Rule, Schedule} from "aws-cdk-lib/aws-events";
 import {CodePipeline as TargetCodePipeline} from "aws-cdk-lib/aws-events-targets";
 import {Secret} from "aws-cdk-lib/aws-secretsmanager";
+import {Trigger} from "aws-cdk-lib/triggers";
+import {Runtime} from "aws-cdk-lib/aws-lambda";
+import {NodejsFunction} from "aws-cdk-lib/aws-lambda-nodejs";
 
 const rds = new RDS({});
 const snapshotIdentifier = await findLatestSnapshotArn(env.SOURCE_CLUSTER_NAME);
@@ -41,7 +44,8 @@ const domainZonePrivate = HostedZone.fromLookup(stack, "ZonePrivate", {
     vpcId: env.VPC_ID,
 });
 
-const restoredSecret = Secret.fromSecretNameV2(stack, "RestoredSecret", env.SECRET_NAME);
+const sourceMasterSecret = Secret.fromSecretNameV2(stack, "SourceMasterSecret", env.SOURCE_MASTER_SECRET);
+const masterSecret = Secret.fromSecretNameV2(stack, "MasterSecret", env.MASTER_SECRET);
 
 const today = String(new Date().toISOString().split("T")[0]);
 const clusterResource = `Database${today}`;
@@ -49,7 +53,7 @@ const clusterName = `${env.CLUSTER_NAME}-${today}`;
 const databaseCluster = new ServerlessClusterFromSnapshot(stack, clusterResource, {
     backupRetention: Duration.days(1),
     clusterIdentifier: clusterName,
-    credentials: SnapshotCredentials.fromSecret(restoredSecret),
+    credentials: SnapshotCredentials.fromSecret(masterSecret),
     enableDataApi: true,
     engine: DatabaseClusterEngine.auroraMysql({version: AuroraMysqlEngineVersion.of(engineVersion)}),
     scaling: {
@@ -64,46 +68,39 @@ const databaseCluster = new ServerlessClusterFromSnapshot(stack, clusterResource
 
 databaseCluster.connections.allowDefaultPortFrom(Peer.ipv4(vpc.vpcCidrBlock));
 
-// const changePwdFunction = new NodejsFunction(stack, "ChangePwdFunction", {
-//     bundling: {
-//         minify: false,
-//     },
-//     entry: path.join(
-//         path.dirname(fileURLToPath(import.meta.url)),
-//         "/ChangePassword.js"
-//     ),
-//     environment: {
-//         SECRET_NAME: env.SECRET_NAME,
-//     },
-//     handler: "handler",
-//     memorySize: 1024,
-//     runtime: Runtime.NODEJS_14_X,
-//     timeout: Duration.seconds(5),
-//     vpc,
-// });
-//
-// sourceSecret.grantRead(changePwdFunction);
-//
-// databaseCluster.connections.allowDefaultPortFrom(changePwdFunction);
-//
-// new Trigger(stack, "ChangePwdTrigger", {
-//     executeAfter: [databaseCluster],
-//     handler: changePwdFunction,
-//     executeOnHandlerChange: true,
-// });
-//
-// const triggerFunction = new TriggerFunction(stack, "ChangePwdTrigger", {
-//     code: Code.fromAsset(path.dirname(fileURLToPath(import.meta.url))),
-//     environment: {
-//         SECRET_NAME: env.SECRET_NAME,
-//     },
-//     executeAfter: [databaseCluster],
-//     handler: "ChangePassword.handler",
-//     runtime: Runtime.NODEJS_14_X,
-//     vpc,
-// });
-//
-// sourceSecret.grantRead(triggerFunction);
+const changePwdFunction = new NodejsFunction(stack, "ChangePwdFunction", {
+    bundling: {
+        minify: false,
+    },
+    entry: "dist/ChangePassword.js",
+    environment: {
+        SOURCE_MASTER_SECRET: env.SOURCE_MASTER_SECRET,
+        MASTER_SECRET: env.MASTER_SECRET,
+    },
+    handler: "handler",
+    memorySize: 1024,
+    runtime: Runtime.NODEJS_14_X,
+    timeout: Duration.seconds(5),
+    vpc,
+});
+/**
+ * This is a workaround for the issue https://github.com/aws/aws-cdk/issues/19272
+ */
+changePwdFunction.addPermission("ChangePwdPermission", {
+    principal: new ServicePrincipal("lambda.amazonaws.com"),
+    action: "*",
+});
+
+sourceMasterSecret.grantRead(changePwdFunction);
+masterSecret.grantRead(changePwdFunction);
+
+databaseCluster.connections.allowDefaultPortFrom(changePwdFunction);
+
+new Trigger(stack, "ChangePwdTrigger", {
+    executeAfter: [databaseCluster],
+    handler: changePwdFunction,
+    executeOnHandlerChange: true,
+});
 
 new CnameRecord(stack, "CnameRecord", {
     recordName: env.CLUSTER_NAME,
@@ -124,10 +121,11 @@ const pipeline = new CodePipeline(stack, "DeploymentPipeline", {
                 GITHUB_BRANCH: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.GITHUB_BRANCH},
                 GITHUB_REPO: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.GITHUB_REPO},
                 GITHUB_SECRET: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.GITHUB_SECRET},
+                MASTER_SECRET: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.MASTER_SECRET},
                 PIPELINE_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.PIPELINE_NAME},
                 SCHEDULE: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.SCHEDULE},
-                SECRET_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.SECRET_NAME},
                 SOURCE_CLUSTER_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.SOURCE_CLUSTER_NAME},
+                SOURCE_MASTER_SECRET: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.SOURCE_MASTER_SECRET},
                 STACK_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.STACK_NAME},
                 VPC_ID: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.VPC_ID},
                 ZONE_NAME: {type: BuildEnvironmentVariableType.PLAINTEXT, value: env.ZONE_NAME},
