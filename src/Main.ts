@@ -12,7 +12,7 @@ import {Peer, SubnetType, Vpc} from "aws-cdk-lib/aws-ec2";
 import {CnameRecord, HostedZone} from "aws-cdk-lib/aws-route53";
 import {CodeBuildStep, CodePipeline, CodePipelineSource} from "aws-cdk-lib/pipelines";
 import {BuildEnvironmentVariableType, ComputeType, LinuxBuildImage} from "aws-cdk-lib/aws-codebuild";
-import {ManagedPolicy, AccountPrincipal} from "aws-cdk-lib/aws-iam";
+import {ManagedPolicy, AccountPrincipal, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 import {Rule, Schedule} from "aws-cdk-lib/aws-events";
 import {CodePipeline as TargetCodePipeline} from "aws-cdk-lib/aws-events-targets";
 import {Secret} from "aws-cdk-lib/aws-secretsmanager";
@@ -86,10 +86,10 @@ const changePwdFunction = new NodejsFunction(stack, "ChangePwdFunction", {
 /**
  * This is a workaround for the issue https://github.com/aws/aws-cdk/issues/19272
  */
-changePwdFunction.addPermission("ChangePwdPermission", {
-    principal: new AccountPrincipal(env.CDK_DEFAULT_ACCOUNT),
-    action: "lambda:*",
-});
+changePwdFunction.grantInvoke(new AccountPrincipal(env.CDK_DEFAULT_ACCOUNT));
+changePwdFunction.grantInvoke(new ServicePrincipal("lambda.amazonaws.com"));
+changePwdFunction.currentVersion.grantInvoke(new AccountPrincipal(env.CDK_DEFAULT_ACCOUNT));
+changePwdFunction.currentVersion.grantInvoke(new ServicePrincipal("lambda.amazonaws.com"));
 
 sourceMasterSecret.grantRead(changePwdFunction);
 masterSecret.grantRead(changePwdFunction);
