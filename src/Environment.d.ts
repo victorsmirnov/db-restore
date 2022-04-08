@@ -7,13 +7,13 @@ declare global {
 
             CLUSTER_NAME: string;
 
+            DATABASE_HOST?: string;
+
             GITHUB_BRANCH: string;
 
             GITHUB_REPO: string;
 
             GITHUB_SECRET: string;
-
-            MASTER_SECRET: string;
 
             SCHEDULE: string;
 
@@ -21,9 +21,11 @@ declare global {
 
             SOURCE_CLUSTER_NAME: string;
 
-            SOURCE_MASTER_SECRET: string;
+            SOURCE_SECRETS: string;
 
             STACK_NAME: string;
+
+            TARGET_SECRETS: string;
 
             VPC_ID: string;
 
