@@ -73,7 +73,7 @@ const changePwdFunction = new NodejsFunction(stack, "ChangePwdFunction", {
     handler: "handler",
     memorySize: 1024,
     runtime: Runtime.NODEJS_14_X,
-    timeout: Duration.seconds(5),
+    timeout: Duration.seconds(60),
     vpc,
 });
 /**

@@ -8,7 +8,16 @@ export async function handler(): Promise<void> {
     const targetNames = env.TARGET_SECRETS.split(",");
 
     for (let idx = 0; idx < sourceNames.length; ++idx) {
-        await processSecrets(host, String(sourceNames[idx]), String(targetNames[idx]));
+        try {
+            await processSecrets(host, String(sourceNames[idx]), String(targetNames[idx]));
+        } catch (error) {
+            console.log("Failed to update password", {
+                host,
+                sourceSecret: sourceNames[idx],
+                targetSecret: targetNames[idx],
+                error,
+            });
+        }
     }
 }
 
@@ -28,19 +37,20 @@ async function processSecrets(host: string, sourceName: string, targetName: stri
     if (targetSecret.host !== host) {
         targetSecret.host = host;
         await updateSecret(targetName, targetSecret);
-        console.log("Update secret", {secret: targetSecret, host});
+        console.log("Updated host in the secret", {secretName: targetName, newHost: host});
     }
 
     if (await checkLogin({...sourceSecret, host})) {
         await updatePassword({...sourceSecret, host}, targetSecret.password);
+        console.log("Updated database password", {host, username: targetSecret.username});
     }
 
     if (!(await checkLogin(await readSecret(targetName)))) {
-        console.log("Password not updated", {host, username: targetSecret.username});
+        console.log("Password verification failed", {host, secret: targetName, username: targetSecret.username});
         return false;
     }
 
-    console.log("Password updated", {host: targetSecret.host, username: targetSecret.username});
+    console.log("Password verified", {host, secret: targetName, username: targetSecret.username});
     return true;
 }
 
@@ -77,10 +87,8 @@ async function updatePassword(secret: DatabaseSecret, newPassword: string): Prom
     return new Promise((resolve, reject) =>
         mysqlConnection(secret).query(`set password = PASSWORD(?)`, [newPassword], (error) => {
             if (error !== null) {
-                console.log("Failed to update password", {host: secret.host, user: secret.username, error});
                 reject(error);
             }
-            console.log("Updated password", {host: secret.host, user: secret.username});
             resolve();
         })
     );
