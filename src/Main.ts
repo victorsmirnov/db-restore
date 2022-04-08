@@ -77,7 +77,8 @@ const changePwdFunction = new NodejsFunction(stack, "ChangePwdFunction", {
     vpc,
 });
 /**
- * This is a workaround for the issue https://github.com/aws/aws-cdk/issues/19272
+ * This is a workaround for the issue https://github.com/aws/aws-cdk/issues/19272#issuecomment-1092695097
+ * Step 1: Grant permission to anyone to execute the lambda.
  */
 changePwdFunction.grantInvoke(new ServicePrincipal("lambda.amazonaws.com"));
 changePwdFunction.currentVersion.grantInvoke(new ServicePrincipal("lambda.amazonaws.com"));
@@ -102,7 +103,7 @@ const trigger = new Trigger(stack, "ChangePwdTrigger", {
     executeOnHandlerChange: true,
 });
 /**
- * This is a workaround for the issue https://github.com/aws/aws-cdk/issues/19272
+ * Step 2: Make sure we finish lambda changes (including permissions) before dealing with the trigger.
  */
 trigger.node.addDependency(changePwdFunction);
 
