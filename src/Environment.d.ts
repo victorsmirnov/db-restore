@@ -1,37 +1,37 @@
 declare global {
-    namespace NodeJS {
-        interface ProcessEnv {
-            CDK_DEFAULT_ACCOUNT: string;
+  namespace NodeJS {
+    interface ProcessEnv {
+      CDK_DEFAULT_ACCOUNT: string
 
-            CDK_DEFAULT_REGION: string;
+      CDK_DEFAULT_REGION: string
 
-            CLUSTER_NAME: string;
+      CLUSTER_NAME: string
 
-            DATABASE_HOST?: string;
+      DATABASE_HOST?: string
 
-            GITHUB_BRANCH: string;
+      GITHUB_BRANCH: string
 
-            GITHUB_REPO: string;
+      GITHUB_REPO: string
 
-            GITHUB_SECRET: string;
+      GITHUB_SECRET: string
 
-            SCHEDULE: string;
+      SCHEDULE: string
 
-            PIPELINE_NAME: string;
+      PIPELINE_NAME: string
 
-            SOURCE_CLUSTER_NAME: string;
+      SOURCE_CLUSTER_NAME: string
 
-            SOURCE_SECRETS: string;
+      SOURCE_SECRETS: string
 
-            STACK_NAME: string;
+      STACK_NAME: string
 
-            TARGET_SECRETS: string;
+      TARGET_SECRETS: string
 
-            VPC_ID: string;
+      VPC_ID: string
 
-            ZONE_NAME: string;
-        }
+      ZONE_NAME: string
     }
+  }
 }
 
-export {};
+export {}
