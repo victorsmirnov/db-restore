@@ -19,6 +19,8 @@ import { Rule, Schedule } from 'aws-cdk-lib/aws-events'
 import { CodePipeline as TargetCodePipeline } from 'aws-cdk-lib/aws-events-targets'
 import { Construct } from 'constructs'
 import { describeCluster, findLatestSnapshotArn } from './RdsUtils.js'
+import { Pipeline } from 'aws-cdk-lib/aws-codepipeline'
+import { Bucket } from 'aws-cdk-lib/aws-s3'
 
 export async function createRestoreStack (scope: Construct): Promise<Stack> {
   const snapshotIdentifier = await findLatestSnapshotArn(env.SOURCE_CLUSTER_NAME)
@@ -137,8 +139,11 @@ export async function createRestoreStack (scope: Construct): Promise<Stack> {
         }
       }
     },
-    crossAccountKeys: false,
-    pipelineName: env.PIPELINE_NAME,
+    codePipeline: new Pipeline(stack, 'CodePipeline', {
+      artifactBucket: Bucket.fromBucketName(stack, 'BuildBucket', 'build-all-projects'),
+      crossAccountKeys: false,
+      pipelineName: env.PIPELINE_NAME
+    }),
     synth: new CodeBuildStep('DeploymentStack', {
       input: CodePipelineSource.gitHub(env.GITHUB_REPO, env.GITHUB_BRANCH, {
         authentication: SecretValue.secretsManager(env.GITHUB_SECRET)
